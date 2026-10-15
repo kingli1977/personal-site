@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#061018">
+  <title>Ocean — Closer to the ocean.</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Horizon plate is local and replaceable: assets/sunset-horizon.jpg (Unsplash sunset ocean horizon). -->
+  <div id="stage">
+    <div id="fallback" role="img" aria-label="Sunset over the ocean">
+      <p class="fallback-note" id="fallback-note" hidden>This frame needs WebGL. The still above is the sunset horizon.</p>
+    </div>
+    <canvas id="c" aria-hidden="true"></canvas>
+  </div>
+
+  <header class="intro" id="intro">
+    <h1>Ocean — Closer to the ocean.</h1>
+    <p class="kicker">Scroll to descend</p>
+  </header>
+
+  <div class="story">
+    <p data-in="0.08" data-out="0.30">The day stays on the surface a little longer than it should.</p>
+    <p data-in="0.36" data-out="0.58">A line of light, bent by the swell, then gone.</p>
+    <p data-in="0.66" data-out="0.90">Under it, the sun arrives only as columns and dust.</p>
+  </div>
+
+  <button type="button" id="watch">Watch the film</button>
+  <div class="reel" aria-hidden="true"></div>
+
+  <noscript>
+    <style>
+      #c { display: none !important; }
+      #fallback-note { display: block; }
+    </style>
+  </noscript>
+  <script type="module" src="main.js"></script>
+</body>
+</html>
