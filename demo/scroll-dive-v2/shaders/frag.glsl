@@ -208,6 +208,7 @@ vec3 underwater(vec2 uv, vec3 rd, vec3 ro, float t) {
   vec3 base = vec3(0.004, 0.065, 0.105);
   vec3 col = base * extinct;
   col += vec3(0.0, 0.004, 0.036) * extinct;
+  col *= 0.66;
 
   for (int i = 0; i < 6; i++) {
     float fi = float(i);
@@ -216,11 +217,11 @@ vec3 underwater(vec2 uv, vec3 rd, vec3 ro, float t) {
     float tilt = -0.2 + sin(fi * 1.9) * 0.16 + sin(t * 0.18 + fi) * 0.05;
     float d = abs((uv.x - x0) - (1.0 - uv.y) * tilt);
     float crossSec = exp(-d * 22.0);
-    float along = exp(-pow(1.0 - uv.y, 1.2) * 0.7);
-    float topQ = smoothstep(0.75, 0.96, uv.y);
-    float w = crossSec * along * (0.75 + 0.25 * sin(t * 0.4 + fi)) * topQ;
-    vec3 shaftCol = vec3(0.0, 0.018, 0.07);
-    col += shaftCol * w * 0.28;
+    float yNorm = clamp((uv.y - 0.60) / 0.40, 0.0, 1.0);
+    float along = yNorm * yNorm;
+    float w = crossSec * along * (0.75 + 0.25 * sin(t * 0.4 + fi));
+    vec3 shaftCol = vec3(0.02, 0.09, 0.16);
+    col += shaftCol * w * 0.6;
   }
 
   vec2 proj = ro.xz * 0.4 + rd.xz * (4.0 + uv.y * 6.0);
@@ -228,22 +229,26 @@ vec3 underwater(vec2 uv, vec3 rd, vec3 ro, float t) {
   float c1 = seaHeight(proj * 1.3, t * 0.8);
   float c2 = seaHeight(proj * 2.4 + 11.0, t * 0.55);
   float caust = smoothstep(0.22, 0.88, fract(c1 * 4.6 + c2 * 3.1));
-  caust *= smoothstep(0.55, 0.9, uv.y);
-  col += vec3(0.0, 0.016, 0.055) * caust * 0.10;
+  float diveNow = smoothstep(0.0, 1.0, clamp(uDepth, 0.0, 1.0));
+  float line = waterline(uv, diveNow, t * 0.7 + 1.7);
+  float belowLine = line - uv.y;
+  float band = smoothstep(0.08, 0.10, belowLine) * (1.0 - smoothstep(0.23, 0.25, belowLine));
+  caust *= band;
+  col += vec3(0.0, 0.016, 0.055) * caust * 0.22;
 
   vec2 aspect = vec2(uResolution.x / max(uResolution.y, 1.0), 1.0);
-  for (int i = 0; i < 16; i++) {
+  for (int i = 0; i < 24; i++) {
     float fi = float(i);
     float sx = fract(sin(fi * 91.17) * 43758.5453);
     float sy = fract(sin(fi * 13.71) * 24634.634);
-    float sp = 0.02 + sx * 0.03;
-    float y = fract(sy - t * sp);
+    float sp = 0.012 + sx * 0.018;
+    float y = mix(0.90, 0.992, fract(sy + t * sp));
     float x = fract(sx + sin(t * 0.31 + fi * 1.7) * 0.025);
     vec2 d = (uv - vec2(x, y)) * aspect;
-    float rad = 0.0035 + fract(sy * 5.1) * 0.0045;
+    float rad = 0.0016 + fract(sy * 5.1) * 0.0014;
     float blob = exp(-dot(d, d) / (rad * rad));
-    float tw = 0.6 + 0.4 * sin(t * 1.4 + fi);
-    col += vec3(0.425, 0.47, 0.49) * blob * tw * extinct;
+    float tw = 0.84 + 0.16 * sin(t * 1.4 + fi);
+    col += vec3(0.21, 0.25, 0.29) * blob * tw * extinct;
   }
 
   col += vec3(0.0, 0.012, 0.04) * pow(clamp(rd.y, 0.0, 1.0), 1.5) * 0.05;
