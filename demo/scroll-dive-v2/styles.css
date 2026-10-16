@@ -106,9 +106,10 @@ h1 {
   font-size: clamp(1.15rem, 2.5vw, 1.85rem);
   line-height: 1.35;
   letter-spacing: -0.02em;
+  color: #102838;
   opacity: 0;
   pointer-events: none;
-  text-shadow: 0 2px 28px rgba(0, 0, 0, 0.55);
+  text-shadow: none;
 }
 
 #watch {

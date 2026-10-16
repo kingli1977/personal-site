@@ -74,24 +74,24 @@ float seaHeight(vec2 xz, float t) {
 }
 
 vec3 sunDir() {
-  return normalize(vec3(-0.15, 0.19, 0.97));
+  return normalize(vec3(0.28, 0.015, 0.96));
 }
 
 vec3 skyGradient(vec3 rd) {
-  float h = clamp(rd.y * 0.85 + 0.08, 0.0, 1.0);
-  vec3 zenith = vec3(0.012, 0.02, 0.055);
-  vec3 rose = vec3(0.42, 0.09, 0.08);
-  vec3 horizon = vec3(0.95, 0.38, 0.12);
-  vec3 col = mix(horizon, rose, smoothstep(0.0, 0.55, h));
-  col = mix(col, zenith, smoothstep(0.28, 1.0, h));
+  float h = clamp(rd.y * 1.35 + 0.02, 0.0, 1.0);
+  vec3 zenith = vec3(0.015, 0.028, 0.062);
+  vec3 mid = vec3(0.04, 0.055, 0.09);
+  vec3 horizon = vec3(0.20, 0.11, 0.075);
+  vec3 col = mix(horizon, mid, smoothstep(0.0, 0.10, h));
+  col = mix(col, zenith, smoothstep(0.06, 0.38, h));
 
   float sd = max(dot(rd, sunDir()), 0.0);
-  float disk = smoothstep(0.9982, 0.9994, sd);
-  float glow = pow(sd, 140.0);
-  float halo = pow(sd, 12.0);
-  col += vec3(1.0, 0.42, 0.12) * halo * 0.42;
-  col += vec3(1.0, 0.7, 0.32) * glow;
-  col = mix(col, vec3(1.0, 0.95, 0.8), disk);
+  float disk = smoothstep(0.99955, 0.9999, sd);
+  float glow = pow(sd, 520.0);
+  float halo = pow(sd, 110.0);
+  col += vec3(0.42, 0.22, 0.10) * halo * 0.10;
+  col += vec3(0.85, 0.5, 0.22) * glow * 0.28;
+  col = mix(col, vec3(0.98, 0.86, 0.62), disk);
   return col;
 }
 
@@ -99,14 +99,16 @@ vec3 skyColor(vec3 rd, float t) {
   vec3 col = skyGradient(rd);
 
   if (uHasPhoto > 0.5) {
-    float band = (1.0 - smoothstep(0.02, 0.16, abs(rd.y - 0.02)));
-    band *= smoothstep(-0.08, 0.02, rd.y);
+    float band = 1.0 - smoothstep(0.0, 0.07, abs(rd.y - 0.012));
+    band *= smoothstep(-0.03, 0.012, rd.y);
     vec2 puv = vec2(
       clamp(0.5 + rd.x * 0.7, 0.0, 1.0),
       clamp(0.55 + rd.y * 1.2, 0.35, 0.95)
     );
     vec3 photo = pow(texture2D(uHorizon, puv).rgb, vec3(2.2));
-    col = mix(col, photo, band * 0.7);
+    float luma = dot(photo, vec3(0.2126, 0.7152, 0.0722));
+    photo = mix(photo, luma * vec3(0.50, 0.64, 0.92), 0.78);
+    col = mix(col, photo, band * 0.32);
   }
 
   vec2 cuv = rd.xz / max(rd.y + 0.55, 0.22);
@@ -114,11 +116,8 @@ vec3 skyColor(vec3 rd, float t) {
   float clouds = smoothstep(0.50, 0.74, fbm(cuv * 1.05));
   float wisps = smoothstep(0.58, 0.86, fbm(cuv * 2.15 + vec2(t * 0.09, 6.0)));
   float mask = smoothstep(0.0, 0.22, rd.y) * (1.0 - smoothstep(0.72, 0.95, rd.y));
-  vec3 cloudCol = mix(vec3(0.72, 0.28, 0.14), vec3(1.0, 0.72, 0.55), smoothstep(0.05, 0.5, rd.y));
-  col = mix(col, cloudCol, clamp(clouds * 0.9 + wisps * 0.35, 0.0, 1.0) * mask);
-
-  float sd = max(dot(rd, sunDir()), 0.0);
-  col += vec3(1.0, 0.92, 0.75) * smoothstep(0.9982, 0.9994, sd);
+  vec3 cloudCol = mix(vec3(0.16, 0.11, 0.08), vec3(0.045, 0.062, 0.11), smoothstep(0.0, 0.14, rd.y));
+  col = mix(col, cloudCol, clamp(clouds * 0.55 + wisps * 0.18, 0.0, 1.0) * mask);
   return col;
 }
 
@@ -126,7 +125,7 @@ vec3 reflectedSky(vec3 rd, float t) {
   vec3 col = skyGradient(rd);
   vec2 cuv = rd.xz / max(rd.y + 0.5, 0.25) + vec2(t * 0.05, 1.5);
   float c = noise(cuv * 1.4);
-  col = mix(col, vec3(0.95, 0.55, 0.32), smoothstep(0.5, 0.85, c) * smoothstep(0.0, 0.18, rd.y) * 0.4);
+  col = mix(col, vec3(0.42, 0.5, 0.62), smoothstep(0.5, 0.85, c) * smoothstep(0.02, 0.2, rd.y) * 0.28);
   return col;
 }
 
@@ -196,20 +195,20 @@ vec3 shadeSea(vec3 p, vec3 rd, vec3 n, float dist, float t) {
   float fres = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
   float ndl = clamp(dot(n, sun), 0.0, 1.0);
 
-  vec3 deep = vec3(0.002, 0.018, 0.026);
-  vec3 body = vec3(0.02, 0.11, 0.11);
+  vec3 deep = vec3(0.002, 0.02, 0.045);
+  vec3 body = vec3(0.008, 0.04, 0.075);
   vec3 water = mix(deep, body, smoothstep(0.0, 0.8, ndl));
-  vec3 col = mix(water, reflectedSky(refl, t), clamp(fres * 0.62, 0.0, 0.92));
+  vec3 col = mix(water, reflectedSky(refl, t), clamp(fres * 0.55, 0.0, 0.82));
 
   vec3 halfVec = normalize(sun - rd);
   float ndh = clamp(dot(n, halfVec), 0.0, 1.0);
   float spec = pow(ndh, 28.0);
   float glint = pow(ndh, 140.0);
-  col += vec3(1.0, 0.62, 0.28) * spec * 0.55;
-  col += vec3(1.0, 0.97, 0.88) * glint * 2.8;
+  col += vec3(0.72, 0.5, 0.28) * spec * 0.16;
+  col += vec3(0.9, 0.82, 0.62) * glint * 0.42;
 
   float crest = smoothstep(0.42, 0.62, p.y) * pow(clamp(n.y, 0.0, 1.0), 2.0);
-  col = mix(col, vec3(0.78, 0.7, 0.6), crest * 0.4);
+  col = mix(col, vec3(0.45, 0.5, 0.55), crest * 0.18);
 
   float fog = smoothstep(12.0, 58.0, dist);
   vec3 fogCol = skyGradient(vec3(rd.x * 0.25, 0.02, abs(rd.z)));
@@ -218,8 +217,8 @@ vec3 shadeSea(vec3 p, vec3 rd, vec3 n, float dist, float t) {
 }
 
 float waterline(vec2 uv, float dive, float t) {
-  float rise = smoothstep(0.08, 0.64, dive);
-  float base = mix(0.50, 1.18, rise);
+  float rise = smoothstep(0.0, 0.30, dive);
+  float base = mix(0.55, 1.22, rise);
   float s = sin(uv.x * 21.0 + t * 0.8) * 0.046;
   s += sin(uv.x * 48.0 - t * 1.15) * 0.022;
   float field = seaHeight(vec2(uv.x * 34.0 + 0.4, 2.4), t);
@@ -229,9 +228,11 @@ float waterline(vec2 uv, float dive, float t) {
 }
 
 vec3 underwater(vec2 uv, vec3 rd, vec3 ro, float t) {
-  float g = clamp(uv.y * 0.9 + rd.y * 0.25 + 0.05, 0.0, 1.0);
-  vec3 col = mix(vec3(0.0, 0.015, 0.03), vec3(0.0, 0.09, 0.11), smoothstep(0.0, 0.6, g));
-  col = mix(col, vec3(0.04, 0.2, 0.22), smoothstep(0.45, 1.0, g));
+  float down = clamp(1.0 - uv.y, 0.0, 1.0);
+  float extinct = exp(-down * 3.15) * exp(-clamp(-rd.y, 0.0, 1.0) * 0.85);
+  vec3 base = vec3(0.004, 0.065, 0.105);
+  vec3 col = base * extinct;
+  col += vec3(0.0, 0.004, 0.036) * extinct;
 
   for (int i = 0; i < 6; i++) {
     float fi = float(i);
@@ -241,10 +242,10 @@ vec3 underwater(vec2 uv, vec3 rd, vec3 ro, float t) {
     float d = abs((uv.x - x0) - (1.0 - uv.y) * tilt);
     float crossSec = exp(-d * 22.0);
     float along = exp(-pow(1.0 - uv.y, 1.2) * 0.7);
-    float w = crossSec * along * (0.75 + 0.25 * sin(t * 0.4 + fi));
-    vec3 warm = vec3(0.95, 0.7, 0.36);
-    vec3 cool = vec3(0.4, 0.85, 0.8);
-    col += mix(cool, warm, smoothstep(0.1, 0.95, uv.y)) * w * 0.85;
+    float topQ = smoothstep(0.75, 0.96, uv.y);
+    float w = crossSec * along * (0.75 + 0.25 * sin(t * 0.4 + fi)) * topQ;
+    vec3 shaftCol = vec3(0.0, 0.018, 0.07);
+    col += shaftCol * w * 0.28;
   }
 
   vec2 proj = ro.xz * 0.4 + rd.xz * (4.0 + uv.y * 6.0);
@@ -252,8 +253,8 @@ vec3 underwater(vec2 uv, vec3 rd, vec3 ro, float t) {
   float c1 = seaHeight(proj * 1.3, t * 0.8);
   float c2 = seaHeight(proj * 2.4 + 11.0, t * 0.55);
   float caust = smoothstep(0.22, 0.88, fract(c1 * 4.6 + c2 * 3.1));
-  caust *= smoothstep(0.0, 0.4, uv.y);
-  col += vec3(0.3, 0.75, 0.7) * caust * 0.34;
+  caust *= smoothstep(0.55, 0.9, uv.y);
+  col += vec3(0.0, 0.016, 0.055) * caust * 0.10;
 
   vec2 aspect = vec2(uResolution.x / max(uResolution.y, 1.0), 1.0);
   for (int i = 0; i < 16; i++) {
@@ -264,12 +265,13 @@ vec3 underwater(vec2 uv, vec3 rd, vec3 ro, float t) {
     float y = fract(sy - t * sp);
     float x = fract(sx + sin(t * 0.31 + fi * 1.7) * 0.025);
     vec2 d = (uv - vec2(x, y)) * aspect;
-    float rad = 0.008 + fract(sy * 5.1) * 0.014;
+    float rad = 0.0035 + fract(sy * 5.1) * 0.0045;
     float blob = exp(-dot(d, d) / (rad * rad));
-    col += vec3(0.85, 0.94, 0.98) * blob * (0.6 + 0.4 * sin(t * 1.4 + fi));
+    float tw = 0.6 + 0.4 * sin(t * 1.4 + fi);
+    col += vec3(0.425, 0.47, 0.49) * blob * tw * extinct;
   }
 
-  col += vec3(0.45, 0.7, 0.6) * pow(clamp(rd.y, 0.0, 1.0), 1.5) * 0.22;
+  col += vec3(0.0, 0.012, 0.04) * pow(clamp(rd.y, 0.0, 1.0), 1.5) * 0.05;
   return col;
 }
 
@@ -293,8 +295,8 @@ void main() {
 
   float seaT = uTime * 0.7 + 1.7;
   float line = waterline(uv, dive, seaT);
-  float gate = smoothstep(0.18, 0.4, dive);
-  float full = smoothstep(0.7, 0.9, dive);
+  float gate = smoothstep(0.06, 0.26, dive);
+  float full = smoothstep(0.18, 0.32, dive);
   float below = 1.0 - smoothstep(line - 0.08, line + 0.02, uv.y);
   float mask = clamp(max(below * gate, full), 0.0, 1.0);
 
@@ -319,10 +321,13 @@ void main() {
   col = mix(col, uw, mask);
 
   float onScreen = smoothstep(-0.12, 0.02, line) * (1.0 - smoothstep(1.02, 1.22, line));
-  float crossWin = smoothstep(0.1, 0.22, dive) * (1.0 - smoothstep(0.58, 0.8, dive));
+  float crossWin = smoothstep(0.04, 0.12, dive) * (1.0 - smoothstep(0.22, 0.32, dive));
   float dLine = uv.y - line;
   float lens = exp(-dLine * dLine * 700.0);
-  col = mix(col, vec3(1.0, 0.94, 0.78), clamp(lens, 0.0, 1.0) * onScreen * crossWin);
+  col = mix(col, vec3(0.55, 0.68, 0.82), clamp(lens, 0.0, 1.0) * onScreen * crossWin * 0.7);
+
+  float abyss = smoothstep(0.40, 0.98, clamp(uDepth, 0.0, 1.0));
+  col *= mix(1.0, 0.42, abyss);
 
   vec2 q = uv - 0.5;
   float vig = dot(q * vec2(0.9, 1.02), q * vec2(0.9, 1.02));
