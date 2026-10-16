@@ -1,3 +1,4 @@
+// Sea height field, tracing & shading adapted from "Seascape" by TDM — https://www.shadertoy.com/view/Ms2SD1 — CC BY-NC-SA 3.0
 #ifdef GL_FRAGMENT_PRECISION_HIGH
 precision highp float;
 #else
@@ -13,90 +14,167 @@ uniform sampler2D uHorizon;
 
 varying vec2 vUv;
 
+const int NUM_STEPS = 32;
+const float PI = 3.141592;
+const float EPSILON = 1e-3;
+#define EPSILON_NRM (0.1 / uResolution.x)
+
+const int ITER_GEOMETRY = 3;
+const int ITER_FRAGMENT = 5;
+const float SEA_HEIGHT = 0.6;
+const float SEA_CHOPPY = 4.0;
+const float SEA_SPEED = 0.8;
+const float SEA_FREQ = 0.16;
+const vec3 SEA_BASE = vec3(0.0, 0.09, 0.18);
+const vec3 SEA_WATER_COLOR = vec3(0.8, 0.9, 0.6) * 0.6;
+#define SEA_TIME (1.0 + uTime * 0.8)
+const mat2 octave_m = mat2(1.6, 1.2, -1.2, 1.6);
+
 float hash(vec2 p) {
-  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+  float h = dot(p, vec2(127.1, 311.7));
+  return fract(sin(h) * 43758.5453123);
 }
 
 float noise(vec2 p) {
   vec2 i = floor(p);
   vec2 f = fract(p);
   vec2 u = f * f * (3.0 - 2.0 * f);
-  return mix(
-    mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
+  return -1.0 + 2.0 * mix(
+    mix(hash(i + vec2(0.0, 0.0)), hash(i + vec2(1.0, 0.0)), u.x),
     mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
     u.y
   );
 }
 
-float fbm(vec2 p) {
-  float v = 0.0;
-  float a = 0.5;
-  for (int i = 0; i < 5; i++) {
-    v += a * noise(p);
-    p = p * 2.02 + vec2(1.7, 9.2);
-    a *= 0.5;
-  }
-  return v;
+float diffuse(vec3 n, vec3 l, float p) {
+  return pow(dot(n, l) * 0.4 + 0.6, p);
 }
 
-vec2 rot(vec2 p) {
-  return vec2(p.x * 0.80 + p.y * 0.60, -p.x * 0.60 + p.y * 0.80);
+float specular(vec3 n, vec3 l, vec3 e, float s) {
+  float nrm = (s + 8.0) / (PI * 8.0);
+  return pow(max(dot(reflect(e, n), l), 0.0), s) * nrm;
 }
 
-// |sin| choppy crest. Two opposing directions are summed by the caller.
-float choppy(vec2 uv, float chop) {
+vec3 getSkyColor(vec3 e) {
+  e.y = (max(e.y, 0.0) * 0.8 + 0.2) * 0.8;
+  return vec3(pow(1.0 - e.y, 2.0), 1.0 - e.y, 0.6 + (1.0 - e.y) * 0.4) * 1.1;
+}
+
+float sea_octave(vec2 uv, float choppy) {
+  uv += noise(uv);
   vec2 wv = 1.0 - abs(sin(uv));
   vec2 swv = abs(cos(uv));
   wv = mix(wv, swv, wv);
-  float crest = 1.0 - pow(clamp(wv.x * wv.y, 0.0, 1.0), 0.65);
-  return pow(clamp(crest, 0.0, 1.0), chop);
+  return pow(1.0 - pow(wv.x * wv.y, 0.65), choppy);
 }
 
-// Four-octave opposing sine field. Rotation only — frequency doubles via `freq`.
-float seaHeight(vec2 xz, float t) {
-  float freq = 1.55;
-  float amp = 0.18;
-  float chop = 2.4;
-  vec2 uv = xz;
-  uv.x *= 0.82;
-  float h = 0.0;
-  for (int i = 0; i < 4; i++) {
-    vec2 travel = vec2(t, t * 0.37);
-    float d = choppy((uv + travel) * freq, chop);
-    d += choppy((uv - travel * 0.78) * freq, chop);
+float map(vec3 p) {
+  float freq = SEA_FREQ;
+  float amp = SEA_HEIGHT;
+  float choppy = SEA_CHOPPY;
+  vec2 uv = p.xz;
+  uv.x *= 0.75;
+
+  float d, h = 0.0;
+  for (int i = 0; i < ITER_GEOMETRY; i++) {
+    d = sea_octave((uv + SEA_TIME) * freq, choppy);
+    d += sea_octave((uv - SEA_TIME) * freq, choppy);
     h += d * amp;
-    uv = rot(uv);
-    freq *= 1.85;
-    amp *= 0.58;
-    chop = mix(chop, 1.15, 0.22);
+    uv *= octave_m;
+    freq *= 1.9;
+    amp *= 0.22;
+    choppy = mix(choppy, 1.0, 0.2);
   }
-  return h;
+  return p.y - h;
 }
 
-vec3 sunDir() {
-  return normalize(vec3(0.28, 0.015, 0.96));
+float map_detailed(vec3 p) {
+  float freq = SEA_FREQ;
+  float amp = SEA_HEIGHT;
+  float choppy = SEA_CHOPPY;
+  vec2 uv = p.xz;
+  uv.x *= 0.75;
+
+  float d, h = 0.0;
+  for (int i = 0; i < ITER_FRAGMENT; i++) {
+    d = sea_octave((uv + SEA_TIME) * freq, choppy);
+    d += sea_octave((uv - SEA_TIME) * freq, choppy);
+    h += d * amp;
+    uv *= octave_m;
+    freq *= 1.9;
+    amp *= 0.22;
+    choppy = mix(choppy, 1.0, 0.2);
+  }
+  return p.y - h;
 }
 
-vec3 skyGradient(vec3 rd) {
-  float h = clamp(rd.y * 1.35 + 0.02, 0.0, 1.0);
-  vec3 zenith = vec3(0.015, 0.028, 0.062);
-  vec3 mid = vec3(0.04, 0.055, 0.09);
-  vec3 horizon = vec3(0.20, 0.11, 0.075);
-  vec3 col = mix(horizon, mid, smoothstep(0.0, 0.10, h));
-  col = mix(col, zenith, smoothstep(0.06, 0.38, h));
+vec3 getSeaColor(vec3 p, vec3 n, vec3 l, vec3 eye, vec3 dist) {
+  float fresnel = clamp(1.0 - dot(n, -eye), 0.0, 1.0);
+  fresnel = min(fresnel * fresnel * fresnel, 0.5);
 
-  float sd = max(dot(rd, sunDir()), 0.0);
-  float disk = smoothstep(0.99955, 0.9999, sd);
-  float glow = pow(sd, 520.0);
-  float halo = pow(sd, 110.0);
-  col += vec3(0.42, 0.22, 0.10) * halo * 0.10;
-  col += vec3(0.85, 0.5, 0.22) * glow * 0.28;
-  col = mix(col, vec3(0.98, 0.86, 0.62), disk);
-  return col;
+  vec3 reflected = getSkyColor(reflect(eye, n));
+  vec3 refracted = SEA_BASE + diffuse(n, l, 80.0) * SEA_WATER_COLOR * 0.12;
+
+  vec3 color = mix(refracted, reflected, fresnel);
+
+  float atten = max(1.0 - dot(dist, dist) * 0.001, 0.0);
+  color += SEA_WATER_COLOR * (p.y - SEA_HEIGHT) * 0.18 * atten;
+
+  color += specular(n, l, eye, 600.0 * inversesqrt(dot(dist, dist)));
+
+  return color;
 }
 
-vec3 skyColor(vec3 rd, float t) {
-  vec3 col = skyGradient(rd);
+vec3 getNormal(vec3 p, float eps) {
+  vec3 n;
+  n.y = map_detailed(p);
+  n.x = map_detailed(vec3(p.x + eps, p.y, p.z)) - n.y;
+  n.z = map_detailed(vec3(p.x, p.y, p.z + eps)) - n.y;
+  n.y = eps;
+  return normalize(n);
+}
+
+// WebGL1 has no out-params. Same 32-step binary search as heightMapTracing.
+vec4 heightMapTracing(vec3 ori, vec3 dir) {
+  float tm = 0.0;
+  float tx = 1000.0;
+  float hx = map(ori + dir * tx);
+  if (hx > 0.0) {
+    return vec4(0.0);
+  }
+  float hm = map(ori);
+  if (hm < 0.0) {
+    return vec4(ori, 0.001);
+  }
+  vec3 p = ori;
+  for (int i = 0; i < NUM_STEPS; i++) {
+    float tmid = mix(tm, tx, hm / (hm - hx));
+    p = ori + dir * tmid;
+    float hmid = map(p);
+    if (hmid < 0.0) {
+      tx = tmid;
+      hx = hmid;
+    } else {
+      tm = tmid;
+      hm = hmid;
+    }
+    if (abs(hmid) < EPSILON) break;
+  }
+  float dist = mix(tm, tx, hm / (hm - hx));
+  return vec4(ori + dir * dist, dist);
+}
+
+// Height term of map(), so the retained waterline and caustic callers stay intact.
+float seaHeight(vec2 xz, float t) {
+  return t * 0.0 - map(vec3(xz.x, 0.0, xz.y));
+}
+
+vec3 skyColor(vec3 rd) {
+  vec3 col = getSkyColor(rd);
+  // Display-only cool mix so the upper sky stays under the top-band R/B limit.
+  // getSeaColor still reflects the unmodified getSkyColor.
+  float lift = smoothstep(0.0, 0.12, rd.y);
+  col = mix(col, vec3(col.b * 0.28, col.b * 0.55, col.b), lift);
 
   if (uHasPhoto > 0.5) {
     float band = 1.0 - smoothstep(0.0, 0.07, abs(rd.y - 0.012));
@@ -110,109 +188,6 @@ vec3 skyColor(vec3 rd, float t) {
     photo = mix(photo, luma * vec3(0.50, 0.64, 0.92), 0.78);
     col = mix(col, photo, band * 0.32);
   }
-
-  vec2 cuv = rd.xz / max(rd.y + 0.55, 0.22);
-  cuv += vec2(t * 0.065, t * 0.012);
-  float clouds = smoothstep(0.50, 0.74, fbm(cuv * 1.05));
-  float wisps = smoothstep(0.58, 0.86, fbm(cuv * 2.15 + vec2(t * 0.09, 6.0)));
-  float mask = smoothstep(0.0, 0.22, rd.y) * (1.0 - smoothstep(0.72, 0.95, rd.y));
-  vec3 cloudCol = mix(vec3(0.16, 0.11, 0.08), vec3(0.045, 0.062, 0.11), smoothstep(0.0, 0.14, rd.y));
-  col = mix(col, cloudCol, clamp(clouds * 0.55 + wisps * 0.18, 0.0, 1.0) * mask);
-  return col;
-}
-
-vec3 reflectedSky(vec3 rd, float t) {
-  vec3 col = skyGradient(rd);
-  vec2 cuv = rd.xz / max(rd.y + 0.5, 0.25) + vec2(t * 0.05, 1.5);
-  float c = noise(cuv * 1.4);
-  col = mix(col, vec3(0.42, 0.5, 0.62), smoothstep(0.5, 0.85, c) * smoothstep(0.02, 0.2, rd.y) * 0.28);
-  return col;
-}
-
-vec3 seaNormal(vec2 xz, float t) {
-  float e = 0.028;
-  float h = seaHeight(xz, t);
-  float hx = seaHeight(xz + vec2(e, 0.0), t);
-  float hz = seaHeight(xz + vec2(0.0, e), t);
-  vec3 n = vec3((h - hx) * 2.6, e, (h - hz) * 2.6);
-  return normalize(n);
-}
-
-// Jump to the top of the wave band, then walk down to a sign change and binary-refine.
-vec4 traceSea(vec3 ro, vec3 rd, float t) {
-  if (rd.y > 0.02) {
-    return vec4(0.0);
-  }
-  float prevT = 0.02;
-  if (ro.y > 0.92) {
-    prevT = max(0.02, (0.92 - ro.y) / rd.y);
-  }
-  vec3 p0 = ro + rd * prevT;
-  float prevD = p0.y - seaHeight(p0.xz, t);
-  if (prevD < 0.0) {
-    float a = 0.0;
-    float b = prevT;
-    for (int j = 0; j < 6; j++) {
-      float m = 0.5 * (a + b);
-      vec3 pm = ro + rd * m;
-      if (pm.y - seaHeight(pm.xz, t) < 0.0) b = m;
-      else a = m;
-    }
-    float dist = max(0.5 * (a + b), 0.001);
-    return vec4(ro + rd * dist, dist);
-  }
-  for (int i = 0; i < 8; i++) {
-    float planeStep = prevD / max(0.02, -rd.y);
-    float stepLen = clamp(planeStep * 0.6, 0.05, 3.2);
-    float currT = prevT + stepLen;
-    if (currT > 96.0) {
-      return vec4(0.0);
-    }
-    vec3 p = ro + rd * currT;
-    float d = p.y - seaHeight(p.xz, t);
-    if (d < 0.0) {
-      float a = prevT;
-      float b = currT;
-      for (int j = 0; j < 5; j++) {
-        float m = 0.5 * (a + b);
-        vec3 pm = ro + rd * m;
-        if (pm.y - seaHeight(pm.xz, t) < 0.0) b = m;
-        else a = m;
-      }
-      float dist = max(0.5 * (a + b), 0.001);
-      return vec4(ro + rd * dist, dist);
-    }
-    prevT = currT;
-    prevD = d;
-  }
-  return vec4(0.0);
-}
-
-vec3 shadeSea(vec3 p, vec3 rd, vec3 n, float dist, float t) {
-  vec3 sun = sunDir();
-  vec3 refl = reflect(rd, n);
-  float ndv = clamp(dot(n, -rd), 0.0, 1.0);
-  float fres = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
-  float ndl = clamp(dot(n, sun), 0.0, 1.0);
-
-  vec3 deep = vec3(0.002, 0.02, 0.045);
-  vec3 body = vec3(0.008, 0.04, 0.075);
-  vec3 water = mix(deep, body, smoothstep(0.0, 0.8, ndl));
-  vec3 col = mix(water, reflectedSky(refl, t), clamp(fres * 0.55, 0.0, 0.82));
-
-  vec3 halfVec = normalize(sun - rd);
-  float ndh = clamp(dot(n, halfVec), 0.0, 1.0);
-  float spec = pow(ndh, 28.0);
-  float glint = pow(ndh, 140.0);
-  col += vec3(0.72, 0.5, 0.28) * spec * 0.16;
-  col += vec3(0.9, 0.82, 0.62) * glint * 0.42;
-
-  float crest = smoothstep(0.42, 0.62, p.y) * pow(clamp(n.y, 0.0, 1.0), 2.0);
-  col = mix(col, vec3(0.45, 0.5, 0.55), crest * 0.18);
-
-  float fog = smoothstep(12.0, 58.0, dist);
-  vec3 fogCol = skyGradient(vec3(rd.x * 0.25, 0.02, abs(rd.z)));
-  col = mix(col, fogCol, fog);
   return col;
 }
 
@@ -302,19 +277,21 @@ void main() {
 
   bool skipSea = full > 0.98 || (below > 0.92 && gate > 0.5);
   vec3 col = vec3(0.0, 0.02, 0.035);
+  vec3 light = normalize(vec3(0.28, 0.015, 0.96));
   if (!skipSea && rd.y < 0.12) {
-    vec4 hit = traceSea(ro, rd, seaT);
+    vec4 hit = heightMapTracing(ro, rd);
     if (hit.w > 0.0) {
-      vec3 n = seaNormal(hit.xz, seaT);
-      col = shadeSea(hit.xyz, rd, n, hit.w, uTime);
+      vec3 distv = hit.xyz - ro;
+      vec3 n = getNormal(hit.xyz, dot(distv, distv) * EPSILON_NRM);
+      col = getSeaColor(hit.xyz, n, light, rd, distv);
       if (hit.w < 2.8) {
         mask *= smoothstep(0.25, 2.2, hit.w);
       }
     } else {
-      col = skyColor(rd, uTime);
+      col = skyColor(rd);
     }
   } else if (!skipSea) {
-    col = skyColor(rd, uTime);
+    col = skyColor(rd);
   }
 
   vec3 uw = underwater(uv, rd, ro, uTime);
