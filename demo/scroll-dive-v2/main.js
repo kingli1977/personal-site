@@ -15,6 +15,9 @@ let targetX = 0;
 let targetY = 0;
 let filmToken = 0;
 let pixelScale = 1;
+const scaleSteps = [1, 0.85, 0.7, 0.55];
+let scaleIndex = 0;
+let scaleHoldUntil = 0;
 let frameTimes = [];
 let gl = null;
 let program = null;
@@ -118,12 +121,15 @@ function adaptScale(wallMs) {
   frameTimes.push(wallMs);
   if (frameTimes.length > 8) frameTimes.shift();
   if (frameTimes.length < 4) return;
+  if (performance.now() < scaleHoldUntil) return;
   const avg = frameTimes.reduce((sum, value) => sum + value, 0) / frameTimes.length;
-  let next = pixelScale;
-  if (avg > 34 && pixelScale > 0.55) next = Math.max(0.55, pixelScale * 0.82);
-  else if (avg < 18 && pixelScale < 1) next = Math.min(1, pixelScale * 1.06);
-  if (Math.abs(next - pixelScale) > 0.02) {
-    pixelScale = next;
+  let next = scaleIndex;
+  if (avg > 34 && scaleIndex < scaleSteps.length - 1) next = scaleIndex + 1;
+  else if (avg < 15 && scaleIndex > 0) next = scaleIndex - 1;
+  if (next !== scaleIndex) {
+    scaleIndex = next;
+    pixelScale = scaleSteps[scaleIndex];
+    scaleHoldUntil = performance.now() + 2500;
     frameTimes.length = 0;
     resize();
   }

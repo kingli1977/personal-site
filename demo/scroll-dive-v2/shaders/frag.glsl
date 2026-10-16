@@ -14,7 +14,7 @@ uniform sampler2D uHorizon;
 
 varying vec2 vUv;
 
-const int NUM_STEPS = 32;
+const int NUM_STEPS = 10;
 const float PI = 3.141592;
 const float EPSILON = 1e-3;
 #define EPSILON_NRM (0.1 / uResolution.x)
