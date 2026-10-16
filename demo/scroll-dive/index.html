@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Closer to the ocean.</title>
+  <link rel="preload" as="image" href="assets/surface.jpg">
+  <link rel="preload" as="image" href="assets/transition.jpg">
+  <link rel="preload" as="image" href="assets/deep.jpg">
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      document.documentElement.classList.add("reduced");
+    }
+  </script>
+</head>
+<body>
+  <main>
+    <div class="journey" id="journey">
+      <div class="stage">
+        <div class="bg-parallax">
+          <div class="bg-scale">
+            <div class="scene scene-surface">
+              <div class="breathe" aria-hidden="true"></div>
+              <div class="shimmer" aria-hidden="true"></div>
+            </div>
+            <div class="scene scene-transition"></div>
+            <div class="scene scene-deep"></div>
+          </div>
+        </div>
+
+        <div class="mid-parallax">
+          <div class="beams" aria-hidden="true">
+            <span style="--tilt:-18deg"><i></i></span>
+            <span style="--tilt:-8deg"><i></i></span>
+            <span style="--tilt:2deg"><i></i></span>
+            <span style="--tilt:11deg"><i></i></span>
+            <span style="--tilt:18deg"><i></i></span>
+          </div>
+          <div class="particles" data-count="48" aria-hidden="true"></div>
+          <div class="caustics" aria-hidden="true">
+            <div class="caustic-mesh"></div>
+            <div class="caustic-mesh mesh-b"></div>
+          </div>
+        </div>
+
+        <div class="grain" aria-hidden="true"></div>
+        <div class="scrim" aria-hidden="true"></div>
+
+        <div class="copy-parallax">
+          <h1 class="title">Closer to the ocean.</h1>
+          <p class="subtitle seg-sub">A moment of stillness.</p>
+          <button class="btn seg-btn" id="dive-button" type="button" tabindex="-1">Dive in</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="static-story">
+      <section class="panel" id="panel-surface" aria-label="Surface">
+        <div class="scene scene-surface"></div>
+        <div class="grain" aria-hidden="true"></div>
+        <div class="scrim" aria-hidden="true"></div>
+        <div class="panel-copy">
+          <h1 class="title">Closer to the ocean.</h1>
+          <p class="subtitle">A moment of stillness.</p>
+          <a class="btn" href="#panel-deep">Dive in</a>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-transition" aria-label="Through the surface">
+        <div class="scene scene-transition"></div>
+        <div class="beams" aria-hidden="true">
+          <span style="--tilt:-18deg"><i></i></span>
+          <span style="--tilt:-8deg"><i></i></span>
+          <span style="--tilt:2deg"><i></i></span>
+          <span style="--tilt:11deg"><i></i></span>
+          <span style="--tilt:18deg"><i></i></span>
+        </div>
+        <div class="grain" aria-hidden="true"></div>
+        <div class="scrim" aria-hidden="true"></div>
+        <div class="panel-copy">
+          <p class="title">Closer to the ocean.</p>
+          <p class="subtitle">A moment of stillness.</p>
+          <a class="btn" href="#panel-deep">Dive in</a>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-deep" aria-label="Deep water">
+        <div class="scene scene-deep"></div>
+        <div class="particles" data-count="48" aria-hidden="true"></div>
+        <div class="caustics" aria-hidden="true">
+          <div class="caustic-mesh"></div>
+          <div class="caustic-mesh mesh-b"></div>
+        </div>
+        <div class="grain" aria-hidden="true"></div>
+        <div class="scrim" aria-hidden="true"></div>
+        <div class="panel-copy">
+          <p class="title">Closer to the ocean.</p>
+          <p class="subtitle">A moment of stillness.</p>
+          <a class="btn" href="#panel-deep">Dive in</a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <noscript>
+    <style>
+      .seg-sub,
+      .seg-btn { opacity: 1 !important; transform: none !important; }
+      .seg-btn { pointer-events: auto !important; }
+    </style>
+  </noscript>
+  <script src="vendor/gsap.min.js" defer></script>
+  <script src="vendor/ScrollTrigger.min.js" defer></script>
+  <script src="main.js" defer></script>
+</body>
+</html>
